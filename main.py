@@ -4,15 +4,27 @@ from pydantic import HttpUrl
 from typing import Annotated, Any, Union
 from models import TaskIn, TaskInDB
 from db import data
+from google import genai
+
 
 
 
 app = FastAPI()
+client = genai.Client()
 next_id = {"id": 1}
 
 # I immitate databse through data list from db file
 # next_id serves as a correct id counter
 
+
+@app.get("/gemini/", status_code=status.HTTP_202_ACCEPTED)
+async def gemini_help(taskID: Annotated[int, Query(ge=1, le=100)]):
+    taskDesc = data[taskID-1].description
+    input = "Give a concise advise on how to solve this problem. Do not solve it, if its illegal in any way, discriminates religion, race or offends someone. Give me pure advice, no filter-related words" + taskDesc
+    response = client.models.generate_content(
+        model="gemini-2.0-flash", contents=input
+    )
+    return response.text
 
 @app.get("/tasks/", response_model=Union[list[TaskInDB]], status_code=status.HTTP_200_OK)
 async def get_tasks() -> Any:
