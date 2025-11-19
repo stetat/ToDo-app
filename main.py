@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Body, Query, status, responses, HTTPException, Response, Path
+from fastapi import FastAPI, Body, Query, status, responses, HTTPException, Response, Path, File, UploadFile
 import json
 from pydantic import HttpUrl
 from typing import Annotated, Any, Union
-from models import TaskIn, TaskInDB
+from models import TaskIn, TaskInDB, Status
 from db import data
 from google import genai
 
@@ -15,6 +15,21 @@ next_id = {"id": 1}
 
 # I immitate databse through data list from db file
 # next_id serves as a correct id counter
+
+@app.post("/files/")
+async def create_file(file: Annotated[bytes, File()]):
+    return len(file)
+
+@app.post("/uploadfile/")
+async def create_upload_file(file: Annotated[list[UploadFile], File(description="file read as upload file")]):
+    contents = await file[0].read()
+    await file[0].seek(0)
+    await file[0].write(contents)
+    await file[0].write(b'\n test of .write() method')
+    await file[0].seek(0)
+    contents = await file[0].read()
+    
+    return contents
 
 
 @app.get("/gemini/", status_code=status.HTTP_202_ACCEPTED)
@@ -29,6 +44,15 @@ async def gemini_help(taskID: Annotated[int, Query(ge=1, le=100)]):
 @app.get("/tasks/", response_model=Union[list[TaskInDB]], status_code=status.HTTP_200_OK)
 async def get_tasks() -> Any:
     return data
+
+@app.get("/tasks/{status}")
+async def get_tasks_by_categroy(status: Status):
+    tasks = []
+    for i, item in enumerate(data):
+        if item.status == status:
+            tasks.append(item)
+    
+    return tasks
 
 @app.get("/tasks/{item_id}", response_model=TaskInDB, status_code=status.HTTP_200_OK)
 async def get_task_by_id(item_id: Annotated[int, Path()]) -> Any:
